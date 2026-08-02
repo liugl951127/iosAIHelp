@@ -28,7 +28,7 @@ struct AskAIIntent: AppIntent {
 
     // 让 Siri / Shortcuts 知道如何展示这个 Action
     static var parameterSummary: some ParameterSummary {
-        Summary("问 AI \(\.$question)") {
+        Summary("问 AI ${applicationName} \(\.$question)") {
             \.$sessionId
         }
     }
@@ -86,9 +86,9 @@ struct AskAIShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: AskAIIntent(),
             phrases: [
-                "问 AI \(\.$question)",
-                "问大模型 \(\.$question)",
-                "问智能助手 \(\.$question)"
+                "问 AI ${applicationName} \(\.$question)",
+                "用 ${applicationName} 问 \(\.$question)",
+                "Hey ${applicationName} ask \(\.$question)"
             ],
             shortTitle: "问 AI",
             systemImageName: "brain.head.profile"
