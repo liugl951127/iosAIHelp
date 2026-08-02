@@ -188,7 +188,7 @@ final class VoiceController: NSObject, ObservableObject {
             llm = UnifiedLLMClient(config: cfg)
         }
 
-        store.append(sessionId: sessionId, message: ChatMessage(role: "user", content: text))
+        _ = store.append(sessionId: sessionId, message: ChatMessage(role: "user", content: text))
         let history = store.find(id: sessionId)?.messages ?? []
 
         guard let client = llm else {
@@ -198,7 +198,7 @@ final class VoiceController: NSObject, ObservableObject {
 
         do {
             let answer = try await client.chat(messages: history)
-            store.append(sessionId: sessionId, message: ChatMessage(role: "assistant", content: answer))
+            _ = store.append(sessionId: sessionId, message: ChatMessage(role: "assistant", content: answer))
             lastAnswer = answer
             speak(answer)
         } catch {
@@ -239,7 +239,7 @@ final class VoiceController: NSObject, ObservableObject {
 
     func newSession() {
         sessionId = UUID().uuidString
-        store.loadOrCreate(id: sessionId)
+        _ = store.loadOrCreate(id: sessionId)
         transcript = ""
         partialText = ""
         lastAnswer = ""

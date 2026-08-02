@@ -130,7 +130,7 @@ struct ContentView: View {
         let q = input.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return }
         input = ""
-        ConversationStore.shared.append(sessionId: currentSessionId,
+        _ = ConversationStore.shared.append(sessionId: currentSessionId,
                                         message: ChatMessage(role: "user", content: q))
         refresh()
         loading = true
@@ -140,10 +140,10 @@ struct ContentView: View {
         let history = ConversationStore.shared.find(id: currentSessionId)?.messages ?? []
         do {
             let ans = try await client.chat(messages: history)
-            ConversationStore.shared.append(sessionId: currentSessionId,
+            _ = ConversationStore.shared.append(sessionId: currentSessionId,
                                             message: ChatMessage(role: "assistant", content: ans))
         } catch {
-            ConversationStore.shared.append(sessionId: currentSessionId,
+            _ = ConversationStore.shared.append(sessionId: currentSessionId,
                                             message: ChatMessage(role: "assistant",
                                                                  content: "❌ \(error.localizedDescription)"))
         }
@@ -152,7 +152,7 @@ struct ContentView: View {
 
     private func startNewSession() {
         currentSessionId = UUID().uuidString
-        ConversationStore.shared.loadOrCreate(id: currentSessionId)
+        _ = ConversationStore.shared.loadOrCreate(id: currentSessionId)
         refresh()
     }
 
