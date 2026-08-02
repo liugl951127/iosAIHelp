@@ -20,10 +20,10 @@ settings:
 packages:
   mlx-swift:
     url: https://github.com/ml-explore/mlx-swift
-    from: 0.21.5
+    exactVersion: 0.21.5
   mlx-swift-examples:
     url: https://github.com/ml-explore/mlx-swift-examples
-    from: 2.21.5
+    exactVersion: 2.21.5
 targets:
   AskAIDemo:
     type: application
