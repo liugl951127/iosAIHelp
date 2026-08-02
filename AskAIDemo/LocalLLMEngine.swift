@@ -67,8 +67,9 @@ class LocalLLMConfigStore {
 }
 
 /// 本地大模型推理引擎
-@MainActor
-final class LocalLLMEngine: ObservableObject {
+/// 整个类不强制 @MainActor(让 init 可以在 actor 上下文同步构造),
+/// 内部 @MainActor 方法在调用时 Swift 自动跳到主线程。
+final class LocalLLMEngine: ObservableObject, @unchecked Sendable {
 
     @Published private(set) var state: LocalEngineState = .unloaded
     @Published private(set) var modelInfo: String = ""
@@ -82,12 +83,14 @@ final class LocalLLMEngine: ObservableObject {
     }
 
     /// 加载模型(只加载一次,已加载则直接返回)
+    @MainActor
     func ensureLoaded() async {
         if state == .ready { return }
         await loadModel()
     }
 
     /// 加载模型
+    @MainActor
     func loadModel() async {
         state = .loading(progress: 0.0)
         modelInfo = "正在加载模型..."
@@ -135,6 +138,7 @@ final class LocalLLMEngine: ObservableObject {
     }
 
     /// 卸载模型释放内存
+    @MainActor
     func unload() {
         chatSession = nil
         modelContainer = nil
@@ -148,6 +152,7 @@ final class LocalLLMEngine: ObservableObject {
     /// - Parameters:
     ///   - messages: 完整对话历史
     ///   - onToken: 每个 token 的回调
+    @MainActor
     func generate(messages: [ChatMessage], onToken: @escaping (String) -> Void) async throws {
         guard let session = chatSession else {
             throw NSError(domain: "LocalLLM", code: -1,
