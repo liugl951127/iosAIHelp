@@ -81,6 +81,12 @@ final class LocalLLMEngine: ObservableObject {
         self.config = config
     }
 
+    /// 加载模型(只加载一次,已加载则直接返回)
+    func ensureLoaded() async {
+        if state == .ready { return }
+        await loadModel()
+    }
+
     /// 加载模型
     func loadModel() async {
         state = .loading(progress: 0.0)

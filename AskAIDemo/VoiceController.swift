@@ -46,15 +46,8 @@ final class VoiceController: NSObject, ObservableObject {
         self.llm = UnifiedLLMClient(config: config)
         super.init()
         recognizer?.delegate = self
+        synthesizer.delegate = self
         refreshLLMInfo()
-        NotificationCenter.default.addObserver(
-            self, selector: #selector(speechDidFinish),
-            name: AVSpeechSynthesizer.didFinishSpeechUtteranceNotification, object: nil
-        )
-    }
-
-    deinit {
-        NotificationCenter.default.removeObserver(self)
     }
 
     func reload(config: AppLLMConfig) {
@@ -231,6 +224,7 @@ final class VoiceController: NSObject, ObservableObject {
     }
 
     @objc private func speechDidFinish() {
+        // 保留作为 Notification 兼容(暂时未用)
         Task { @MainActor in
             if self.status == .speaking {
                 self.status = .idle
@@ -257,6 +251,24 @@ extension VoiceController: SFSpeechRecognizerDelegate {
     nonisolated func speechRecognizer(_ speechRecognizer: SFSpeechRecognizer, availabilityDidChange available: Bool) {
         Task { @MainActor in
             if !available { self.status = .idle }
+        }
+    }
+}
+
+extension VoiceController: AVSpeechSynthesizerDelegate {
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        Task { @MainActor in
+            if self.status == .speaking {
+                self.status = .idle
+            }
+        }
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        Task { @MainActor in
+            if self.status == .speaking {
+                self.status = .idle
+            }
         }
     }
 }

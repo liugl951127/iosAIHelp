@@ -155,8 +155,9 @@ actor RemoteLLMClient {
 }
 
 /// 本地 MLX 客户端(包装 LocalLLMEngine)
-@MainActor
-final class LocalLLMClient {
+/// 不强制 MainActor,这样 UnifiedLLMClient(actor)可以在 init 里同步构造
+/// 内部 await LocalLLMEngine(它是 @MainActor)时 Swift 自动切到 main actor
+final class LocalLLMClient: @unchecked Sendable {
     let engine: LocalLLMEngine
 
     init(config: LocalLLMConfig) {
@@ -164,9 +165,7 @@ final class LocalLLMClient {
     }
 
     func chat(messages: [ChatMessage]) async throws -> String {
-        if engine.state != .ready {
-            try await engine.loadModel()
-        }
+        await engine.ensureLoaded()
         var collected = ""
         try await engine.generate(messages: messages) { token in
             collected += token

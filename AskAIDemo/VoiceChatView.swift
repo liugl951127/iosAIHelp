@@ -12,7 +12,7 @@ struct VoiceChatView: View {
     @StateObject private var voice = VoiceController()
     @State private var showSettings = false
     @State private var showChat = false
-    @State private var config: LLMConfig = LLMConfigStore.shared.load()
+    @State private var config: AppLLMConfig = AppLLMConfigStore.shared.load()
 
     var body: some View {
         ZStack {
@@ -34,7 +34,7 @@ struct VoiceChatView: View {
         .onAppear { Task { await voice.requestPermission() } }
         .sheet(isPresented: $showSettings) {
             SettingsView(config: $config) {
-                LLMConfigStore.shared.save(config)
+                AppLLMConfigStore.shared.save(config)
             }
         }
         .sheet(isPresented: $showChat) {

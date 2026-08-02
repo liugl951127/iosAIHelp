@@ -28,7 +28,7 @@ struct AskAIIntent: AppIntent {
 
     // 让 Siri / Shortcuts 知道如何展示这个 Action
     static var parameterSummary: some ParameterSummary {
-        Summary("问 AI：\(\.$question)") {
+        Summary("问 AI \(\.$question)") {
             \.$sessionId
         }
     }
@@ -41,11 +41,16 @@ struct AskAIIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
         // 1) 加载配置
-        let config = LLMConfigStore.shared.load()
-        let client = LLMClient(config: config)
+        let config = AppLLMConfigStore.shared.load()
+        let client = UnifiedLLMClient(config: config)
 
         // 2) 加载/创建会话
-        let sid = sessionId?.isEmpty == false ? sessionId! : UUID().uuidString
+        let sid: String
+        if let s = sessionId, !s.isEmpty {
+            sid = s
+        } else {
+            sid = UUID().uuidString
+        }
         var session = ConversationStore.shared.loadOrCreate(id: sid)
 
         // 3) 追加用户消息
@@ -81,8 +86,8 @@ struct AskAIShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: AskAIIntent(),
             phrases: [
-                "问 AI：\(\.$question)",
-                "用 \(${applicationName}) 提问 \(\.$question)",
+                "问 AI \(\.$question)",
+                "用 \($applicationName) 提问 \(\.$question)",
                 "问大模型 \(\.$question)",
                 "问智能助手 \(\.$question)"
             ],
