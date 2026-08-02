@@ -175,7 +175,6 @@ jobs:
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build/DerivedData \
-            -symroot build/symroot \
             CODE_SIGNING_ALLOWED=NO \
             build
 
@@ -183,6 +182,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AskAIDemo-simulator
-          path: build/symroot/Debug-iphonesimulator/AskAIDemo.app
+          path: build/DerivedData/Build/Products/Debug-iphonesimulator/AskAIDemo.app
           if-no-files-found: error
           retention-days: 7
