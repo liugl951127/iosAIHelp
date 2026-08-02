@@ -113,8 +113,8 @@ actor UnifiedLLMClient {
     }
 }
 
-/// 远端 API 客户端
-actor RemoteLLMClient {
+/// 远端 API 客户端(普通 final class,无共享可变状态,无需 actor 隔离)
+final class RemoteLLMClient: @unchecked Sendable {
     let config: LLMConfig
 
     init(config: LLMConfig) {
