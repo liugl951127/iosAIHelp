@@ -65,8 +65,11 @@ struct VoiceChatView: View {
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.85))
             Spacer()
-            if !config.model.isEmpty {
-                Text(config.model)
+            let displayModel = config.mode == .local
+                ? URL(fileURLWithPath: config.local.modelDirectory).lastPathComponent
+                : config.remote.model
+            if !displayModel.isEmpty {
+                Text(displayModel)
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.5))
             }

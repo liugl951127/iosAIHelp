@@ -87,7 +87,6 @@ struct AskAIShortcuts: AppShortcutsProvider {
             intent: AskAIIntent(),
             phrases: [
                 "问 AI \(\.$question)",
-                "用 \($applicationName) 提问 \(\.$question)",
                 "问大模型 \(\.$question)",
                 "问智能助手 \(\.$question)"
             ],

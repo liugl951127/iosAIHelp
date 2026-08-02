@@ -166,7 +166,7 @@ final class LocalLLMEngine: ObservableObject, @unchecked Sendable {
 
         // 流式生成:ModelContainer 是 actor,用 perform 切到 actor context
         do {
-            try await container.perform { context in
+            try await container.perform { (context: ModelContext) -> Void in
                 // 准备 input
                 let lmInput = try await context.processor.prepare(input: userInput)
 
@@ -176,18 +176,16 @@ final class LocalLLMEngine: ObservableObject, @unchecked Sendable {
                     input: lmInput,
                     parameters: parameters,
                     context: context
-                ) { tokens in
-                    // tokens 是本轮新增的 token id 列表
+                ) { (tokens: [Int]) -> GenerateDisposition in
                     for t in tokens {
                         allTokens.append(t)
                     }
                     return .continue
                 }
 
-                // 一次 decode 整段,逐 token 回调
+                // 一次 decode 整段
                 let text = context.tokenizer.decode(tokens: allTokens)
                 onToken(text)
-                return ()
             }
             state = .ready
         } catch {
