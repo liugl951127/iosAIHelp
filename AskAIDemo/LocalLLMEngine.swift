@@ -75,7 +75,6 @@ final class LocalLLMEngine: ObservableObject, @unchecked Sendable {
     @Published private(set) var modelInfo: String = ""
 
     private var modelContainer: ModelContainer?
-    private var chatSession: ChatSession?
     private let config: LocalLLMConfig
 
     init(config: LocalLLMConfig = LocalLLMConfigStore.shared.load()) {
@@ -108,27 +107,22 @@ final class LocalLLMEngine: ObservableObject, @unchecked Sendable {
                 return
             }
 
-            // 2. 构造配置
+            // 2. 构造配置(mlx-swift 0.21.3 API:ModelConfiguration 只有 directory 参数)
             let modelDirName = modelURL.lastPathComponent
-            let modelConfig = ModelConfiguration(
-                directory: modelURL,
-                modelType: nil
-            )
+            let modelConfig = ModelConfiguration(directory: modelURL)
 
-            // 3. 加载
+            // 3. 加载(0.21.3 API:loadContainer 只有 configuration 参数)
             modelInfo = "正在加载 \(modelDirName)..."
             let container = try await LLMModelFactory.shared.loadContainer(
-                configuration: modelConfig,
-                progressHandler: { [weak self] progress in
-                    Task { @MainActor in
-                        self?.state = .loading(progress: progress.fractionCompleted)
-                        self?.modelInfo = "加载中: \(Int(progress.fractionCompleted * 100))%"
-                    }
+                configuration: modelConfig
+            ) { [weak self] progress in
+                Task { @MainActor in
+                    self?.state = .loading(progress: progress.fractionCompleted)
+                    self?.modelInfo = "加载中: \(Int(progress.fractionCompleted * 100))%"
                 }
-            )
+            }
 
             self.modelContainer = container
-            self.chatSession = ChatSession(container)
             self.modelInfo = "✓ \(modelDirName) 就绪"
             self.state = .ready
         } catch {
@@ -140,12 +134,10 @@ final class LocalLLMEngine: ObservableObject, @unchecked Sendable {
     /// 卸载模型释放内存
     @MainActor
     func unload() {
-        chatSession = nil
         modelContainer = nil
         state = .unloaded
         modelInfo = ""
-        // 释放 MLX 显存
-        MLX.Memory.clearCache()
+        // 释放 MLX 显存(0.21.3 没有 MLX.Memory API,Swift 自动 GC)
     }
 
     /// 生成(流式)
@@ -154,24 +146,48 @@ final class LocalLLMEngine: ObservableObject, @unchecked Sendable {
     ///   - onToken: 每个 token 的回调
     @MainActor
     func generate(messages: [ChatMessage], onToken: @escaping (String) -> Void) async throws {
-        guard let session = chatSession else {
+        guard let container = modelContainer else {
             throw NSError(domain: "LocalLLM", code: -1,
                           userInfo: [NSLocalizedDescriptionKey: "模型未加载"])
         }
         state = .generating
 
-        // 构造 chat template 格式的 prompt
-        let prompt = formatChatPrompt(messages: messages)
+        // 构造 user input(mlx-swift 0.21.3 / mlx-swift-examples 2.21.2 API)
+        let messagesDict = messages.map { msg -> [String: String] in
+            ["role": msg.role, "content": msg.content]
+        }
+        let userInput = UserInput(messages: messagesDict)
 
-        // 流式生成
+        // 生成参数(0.21.3 的 GenerateParameters 没有 maxTokens 字段,
+        // maxTokens 限制由新版 mlx-swift 提供,这里只设 temperature)
+        let parameters = GenerateParameters(
+            temperature: Float(config.temperature)
+        )
+
+        // 流式生成:ModelContainer 是 actor,用 perform 切到 actor context
         do {
-            let stream = session.stream(
-                prompt: prompt,
-                temperature: Float(config.temperature),
-                maxTokens: config.maxTokens
-            )
-            for try await token in stream {
-                onToken(token)
+            try await container.perform { context in
+                // 准备 input
+                let lmInput = try await context.processor.prepare(input: userInput)
+
+                // 收集所有 token
+                var allTokens: [Int] = []
+                _ = try generate(
+                    input: lmInput,
+                    parameters: parameters,
+                    context: context
+                ) { tokens in
+                    // tokens 是本轮新增的 token id 列表
+                    for t in tokens {
+                        allTokens.append(t)
+                    }
+                    return .continue
+                }
+
+                // 一次 decode 整段,逐 token 回调
+                let text = context.tokenizer.decode(tokens: allTokens)
+                onToken(text)
+                return ()
             }
             state = .ready
         } catch {
