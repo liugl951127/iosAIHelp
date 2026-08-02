@@ -170,9 +170,9 @@ final class LocalLLMEngine: ObservableObject, @unchecked Sendable {
                 // 准备 input
                 let lmInput = try await context.processor.prepare(input: userInput)
 
-                // 收集所有 token
+                // 收集所有 token(显式 MLXLMCommon.generate 走 free function,不走实例方法)
                 var allTokens: [Int] = []
-                _ = try generate(
+                _ = try MLXLMCommon.generate(
                     input: lmInput,
                     parameters: parameters,
                     context: context
@@ -180,7 +180,7 @@ final class LocalLLMEngine: ObservableObject, @unchecked Sendable {
                     for t in tokens {
                         allTokens.append(t)
                     }
-                    return .continue
+                    return .more
                 }
 
                 // 一次 decode 整段
