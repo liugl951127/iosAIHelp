@@ -1,0 +1,185 @@
+name: Build AskAIDemo iOS
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Build configuration'
+        required: false
+        default: 'Release'
+        type: choice
+        options:
+          - Release
+          - Debug
+
+env:
+  SCHEME: AskAIDemo
+  PROJECT: AskAIDemo.xcodeproj
+
+jobs:
+  # ==========================================
+  # 真机构建(出 ipa,AltStore 装)
+  # ==========================================
+  build-device:
+    name: Build Device (unsigned ipa)
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show environment
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ~/Library/Developer/Xcode/DerivedData
+            .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved', 'project.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Resolve packages
+        run: |
+          xcodebuild \
+            -project ${{ env.PROJECT }} \
+            -scheme ${{ env.SCHEME }} \
+            -resolvePackageDependencies
+
+      - name: Archive (no signing)
+        run: |
+          mkdir -p build
+          xcodebuild \
+            -project ${{ env.PROJECT }} \
+            -scheme ${{ env.SCHEME }} \
+            -configuration ${{ github.event.inputs.configuration || 'Release' }} \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/AskAIDemo.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            archive
+
+      - name: Create exportOptions.plist
+        run: |
+          cat > exportOptions.plist <<'PLIST_EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>development</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>stripSwiftSymbols</key>
+              <true/>
+              <key>compileBitcode</key>
+              <false/>
+              <key>destination</key>
+              <string>export</string>
+          </dict>
+          </plist>
+          PLIST_EOF
+
+      - name: Export IPA
+        run: |
+          xcodebuild \
+            -exportArchive \
+            -archivePath build/AskAIDemo.xcarchive \
+            -exportPath build/ipa \
+            -exportOptionsPlist exportOptions.plist \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            || {
+              echo "::warning::Export failed, falling back to raw .app bundle"
+              mkdir -p build/ipa
+              cp -R build/AskAIDemo.xcarchive/Products/Applications/AskAIDemo.app build/ipa/
+            }
+
+      - name: List build output
+        run: |
+          echo "=== build/ipa/ ==="
+          ls -la build/ipa/
+          echo "=== Info.plist check ==="
+          plutil -p build/ipa/AskAIDemo.app/Info.plist 2>/dev/null | head -20
+
+      - name: Zip as .ipa
+        run: |
+          cd build/ipa
+          if [ ! -f AskAIDemo.ipa ]; then
+            # 没有 .ipa(只有 .app),手动打 zip 改后缀
+            zip -r AskAIDemo.ipa AskAIDemo.app
+            echo "Manually zipped .app into .ipa"
+          fi
+          ls -la
+          file AskAIDemo.ipa
+
+      - name: Upload .ipa artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AskAIDemo-unsigned
+          path: build/ipa/AskAIDemo.ipa
+          if-no-files-found: error
+          retention-days: 14
+
+  # ==========================================
+  # 模拟器构建(开发调试用,不出 ipa)
+  # ==========================================
+  build-simulator:
+    name: Build Simulator
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate
+        run: xcodegen generate
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ~/Library/Developer/Xcode/DerivedData
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved', 'project.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Build for simulator
+        run: |
+          xcodebuild \
+            -project ${{ env.PROJECT }} \
+            -scheme ${{ env.SCHEME }} \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Upload .app
+        uses: actions/upload-artifact@v4
+        with:
+          name: AskAIDemo-simulator
+          path: build/Build/Products/Debug-iphonesimulator/AskAIDemo.app
+          if-no-files-found: error
+          retention-days: 7
