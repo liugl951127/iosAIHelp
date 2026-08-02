@@ -92,7 +92,7 @@ final class VoiceController: NSObject, ObservableObject {
     }
 
     private func startRecording() async {
-        guard hasPermission else {
+        if !hasPermission {
             await requestPermission()
             guard hasPermission else { return }
         }
