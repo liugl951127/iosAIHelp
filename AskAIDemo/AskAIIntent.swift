@@ -15,10 +15,9 @@ struct AskAIIntent: AppIntent {
     static var description = IntentDescription("向自定义大模型提问,Siri 会朗读答案。")
 
     @Parameter(
-        title: "问题",
-        description: "你想问 AI 的问题"
+        title: "问题"
     )
-    var question: String
+    var question: QuestionEntity
 
     @Parameter(
         title: "会话 ID",
@@ -28,7 +27,7 @@ struct AskAIIntent: AppIntent {
 
     // 让 Siri / Shortcuts 知道如何展示这个 Action
     static var parameterSummary: some ParameterSummary {
-        Summary("问 AI ${applicationName} \(\.$question)") {
+        Summary("问 \(\.$question)") {
             \.$sessionId
         }
     }
@@ -54,7 +53,7 @@ struct AskAIIntent: AppIntent {
         var session = ConversationStore.shared.loadOrCreate(id: sid)
 
         // 3) 追加用户消息
-        let userMsg = ChatMessage(role: "user", content: question)
+        let userMsg = ChatMessage(role: "user", content: question.text)
         session.messages.append(userMsg)
 
         // 4) 调 LLM

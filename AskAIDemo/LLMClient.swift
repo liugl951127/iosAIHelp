@@ -17,8 +17,9 @@ struct ChatMessage: Codable, Equatable {
 struct ChatRequest: Codable {
     let model: String
     let messages: [ChatMessage]
-    let stream: Bool = false
-    let temperature: Double = 0.7
+    // 下面两个不参与 Codable(用 init 时显式设默认,不是 codable 字段)
+    var stream: Bool = false
+    var temperature: Double = 0.7
 }
 
 struct ChatResponse: Codable {
